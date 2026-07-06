@@ -1,0 +1,26 @@
+{
+  "session_id": "example-drift",
+  "goal": "Build a two-week study plan for my linear algebra final covering eigenvalues, diagonalization, and orthogonality.",
+  "turns": [
+    {"role": "user", "text": "My linear algebra final is in two weeks and I need a study plan. The exam covers eigenvalues, diagonalization, orthogonal projections, and least squares."},
+    {"role": "assistant", "text": "Two weeks is workable. Week one: eigenvalues and diagonalization, with practice problems daily. Week two: orthogonality and least squares, plus two full past papers. Which topic feels weakest right now?"},
+    {"role": "user", "text": "Diagonalization for sure. Also, what's the best way to take notes while doing practice problems? I feel like my notes are a mess."},
+    {"role": "assistant", "text": "For problem-solving courses, keep an error log rather than traditional notes: every mistake goes in with the wrong step and the correction. It's more useful for revision than rewriting theory."},
+    {"role": "user", "text": "An error log is interesting. Should I keep it in a physical notebook or an app? I've been trying to pick a note app for months, like Notion versus Obsidian."},
+    {"role": "assistant", "text": "Notion is easier to start with; Obsidian is better for linked, long-term notes. Obsidian stores plain markdown files locally, which some people prefer for ownership of their data."},
+    {"role": "user", "text": "Ooh linked notes sounds like the zettelkasten thing. Is zettelkasten actually useful or is it just a productivity fad?"},
+    {"role": "assistant", "text": "Zettelkasten shines for research and writing, where connecting ideas over years pays off. For most people it becomes procrastination dressed up as organization — the system matters less than the reviewing."},
+    {"role": "user", "text": "That's such a good point about productivity systems being procrastination. I watch so many productivity videos and never actually do the thing. Why is watching productivity content so addictive?"},
+    {"role": "assistant", "text": "It gives the feeling of progress without the discomfort of the actual work — planning is dopamine-cheap, doing is dopamine-expensive. Watching someone organize their life feels adjacent to organizing yours."},
+    {"role": "user", "text": "Dopamine-cheap versus dopamine-expensive is so real. Is the whole dopamine detox trend legit science or another internet myth?"},
+    {"role": "assistant", "text": "The pop version is oversimplified — you can't deplete or reset dopamine like a meter. But the underlying practice of removing high-stimulation habits for a while does help recalibrate what feels rewarding."},
+    {"role": "user", "text": "Makes sense. My phone is definitely the high-stimulation habit. What are the best settings changes to make a phone less addictive, like grayscale mode?"},
+    {"role": "assistant", "text": "Grayscale helps some people, but removing home-screen icons for social apps, turning off all non-human notifications, and moving the phone out of your bedroom have bigger measured effects."},
+    {"role": "user", "text": "The bedroom one is hard because my phone is my alarm. What alarm clock would you recommend, ideally one of those sunrise light ones?"},
+    {"role": "assistant", "text": "Sunrise alarms like the Philips SmartSleep or the Hatch Restore are the popular picks — the light ramps up over 30 minutes before the sound, which makes winter mornings noticeably easier."},
+    {"role": "user", "text": "The Hatch one looks nice. Does it work with smart home stuff? My roommate has been building out a Home Assistant setup and keeps adding devices."},
+    {"role": "assistant", "text": "Hatch's integration story is weak — there's no official API, though the community has reverse-engineered parts of it for Home Assistant. If deep integration matters, a smart bulb plus a regular alarm is more flexible."},
+    {"role": "user", "text": "Interesting, maybe we could rig a smart bulb sunrise alarm with Home Assistant automations then. What hardware does a basic Home Assistant setup need to run?"},
+    {"role": "assistant", "text": "A Raspberry Pi 4 or a small mini-PC is the usual base, plus a Zigbee USB stick if you want to control bulbs and sensors directly without each brand's cloud. From there automations are all YAML or the visual editor."}
+  ]
+}
