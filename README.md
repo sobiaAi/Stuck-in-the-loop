@@ -39,14 +39,32 @@ with flagged regions shaded) plus a text summary:
 chart saved to chart.png
 ```
 
-<!-- TODO: embed example chart screenshot here once metrics are implemented -->
+## Input formats
 
-## Transcript format
+`CHAT` can be any of:
+
+| Format | How to get it |
+|---|---|
+| **ChatGPT export** | Settings → Data controls → Export data; use `conversations.json` from the zip |
+| **Claude export** | Settings → Privacy → Export data; use `conversations.json` |
+| **Pasted text** (`.txt` / `.md`) | Copy a chat and save it. Messages start with a speaker label: `You said:` / `ChatGPT said:`, `User:` / `Assistant:`, or `## User` / `## Assistant` |
+| **stuck-in-the-loop JSON** | See below |
+
+Export files hold every conversation you've had. List them, then pick one by
+index or by part of its title:
+
+```bash
+python -m sil list conversations.json
+python -m sil analyze conversations.json --conversation "study plan" --goal "Build a two-week study plan"
+```
+
+Drift is measured against the session's goal. Give it with `--goal`, or in
+the `goal` field of the JSON format.
 
 ```json
 {
   "session_id": "my-session",
-  "goal": "one-sentence statement of what the session is trying to achieve",
+  "goal": "optional: one-sentence statement of what the session is trying to achieve",
   "turns": [
     {"role": "user", "text": "..."},
     {"role": "assistant", "text": "..."}
@@ -71,14 +89,12 @@ both sides.
 Thresholds live in a `Config` dataclass and were calibrated on the synthetic
 sessions in `examples/`.
 
-<!-- TODO: record final tuned threshold values here -->
-
 ## Limitations (v0.1)
 
 - Agreement markers are lexical, heuristic, and English-only.
 - Thresholds are hand-calibrated on synthetic sessions, not learned.
-- The `goal` field is trusted as given; goal inference from early turns is
-  future work.
+- The goal must be supplied and is trusted as given; inferring it from early
+  turns, and telling a deliberate change of goal apart from drift, is future work.
 - Offline analysis only — real-time monitoring is planned for v0.2.
 
 ## License

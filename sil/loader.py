@@ -4,7 +4,7 @@ Transcript JSON schema:
 
     {
       "session_id": "string",
-      "goal": "one-sentence statement of what the session is trying to achieve",
+      "goal": "optional — one sentence stating what the session is trying to achieve",
       "turns": [
         {"role": "user",      "text": "..."},
         {"role": "assistant", "text": "..."}
@@ -35,7 +35,7 @@ class Turn:
 @dataclass
 class Transcript:
     session_id: str
-    goal: str
+    goal: str | None
     turns: list[Turn] = field(default_factory=list)
 
 
@@ -43,15 +43,15 @@ def load_transcript(path: str) -> Transcript:
     """Load and validate a transcript JSON file.
 
     Raises TranscriptError with a clear message on any violation:
-    missing file, invalid JSON, missing/empty goal, empty turns,
-    or a role other than 'user'/'assistant'.
+    missing file, invalid JSON, empty goal (a missing goal is fine and
+    loads as None), empty turns, or a role other than 'user'/'assistant'.
     """
     p = Path(path)
     if not p.is_file():
         raise TranscriptError(f"Transcript file not found: {path}")
 
     try:
-        raw = json.loads(p.read_text(encoding="utf-8"))
+        raw = json.loads(p.read_text(encoding="utf-8-sig"))
     except json.JSONDecodeError as e:
         raise TranscriptError(f"{path} is not valid JSON: {e}") from e
 
@@ -63,10 +63,10 @@ def load_transcript(path: str) -> Transcript:
         raise TranscriptError(f"{path}: 'session_id' must be a non-empty string")
 
     goal = raw.get("goal")
-    if not isinstance(goal, str) or not goal.strip():
+    if goal is not None and (not isinstance(goal, str) or not goal.strip()):
         raise TranscriptError(
-            f"{path}: 'goal' must be a non-empty string — the detectors "
-            "compare every turn against it"
+            f"{path}: 'goal' must be a non-empty string when present — "
+            "leave it out entirely to have it inferred"
         )
 
     raw_turns = raw.get("turns")

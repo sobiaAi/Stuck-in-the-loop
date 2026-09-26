@@ -41,11 +41,10 @@ def test_invalid_json(tmp_path):
         load_transcript(write(tmp_path, "{nope"))
 
 
-def test_missing_goal(tmp_path):
+def test_missing_goal_loads_as_none(tmp_path):
     data = {**VALID}
     del data["goal"]
-    with pytest.raises(TranscriptError, match="goal"):
-        load_transcript(write(tmp_path, data))
+    assert load_transcript(write(tmp_path, data)).goal is None
 
 
 def test_empty_goal(tmp_path):
