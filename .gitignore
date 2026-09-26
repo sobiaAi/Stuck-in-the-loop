@@ -9,3 +9,4 @@ dist/
 chart.png
 *.png
 !docs/*.png
+.claude/
