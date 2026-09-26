@@ -1,6 +1,6 @@
 """End-to-end: each example transcript triggers its intended flag; the healthy
 transcript triggers none. Needs sentence-transformers (downloads the model on
-first run) and the hand-written metrics — skips cleanly if either is missing.
+first run) and a complete detection engine; skips if either is missing.
 """
 
 from pathlib import Path

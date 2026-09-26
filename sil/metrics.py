@@ -1,5 +1,4 @@
-"""The detection engine. Hand-written — every function body in this file is
-authored by hand; the rest of the package is scaffolding around it.
+"""The detection engine.
 
 All three metrics consume the unit-normalized embedding matrix E of shape
 (n, 384) and/or the raw turns, and return a list[float] of length n — one
@@ -37,9 +36,7 @@ MARKERS = {
 
 @dataclass
 class Config:
-    """Detection thresholds. Defaults are the spec's suggested starting points;
-    tune against the four example transcripts and record final values in the
-    README."""
+    """Detection thresholds."""
 
     novelty_window: int = 3
     agreement_window: int = 4
@@ -65,8 +62,25 @@ def novelty(E: np.ndarray, window: int = 3) -> list[float]:
     E is unit-normalized, so cos_sim(E[t], E[t-k]) == E[t] @ E[t-k].
     First turn is 0.0 (undefined).
     """
-    # NEXT: hand-write per spec 5.1
-    raise NotImplementedError("novelty() is hand-written — see spec section 5.1")
+    if(window<=0):
+        raise ValueError("window must be at least 1")
+    result = []
+    for t in range(len(E)):
+        sims=[]
+        if(t==0):
+            result.append(0.0)
+            continue
+        for k in range(1, window+1):
+            if(t-k >= 0):
+                sim = E[t] @ E[t-k]
+                sims.append(sim)
+        novelty= 1- max(sims)
+        novelty= min(novelty, 1.0)
+        novelty = max(novelty, 0.0)
+        result.append(novelty)
+    return result
+
+
 
 
 def drift(E: np.ndarray, goal_embedding: np.ndarray, alpha: float = 0.3) -> list[float]:
@@ -74,8 +88,19 @@ def drift(E: np.ndarray, goal_embedding: np.ndarray, alpha: float = 0.3) -> list
     exponential moving average so single tangents don't false-flag.
     Detects drift when the series trends upward without recovering.
     """
-    # NEXT: hand-write per spec 5.2
-    raise NotImplementedError("drift() is hand-written — see spec section 5.2")
+    result=[]
+    for t in range(len(E)):
+        raw_drift = 1 - E[t] @ goal_embedding
+        raw_drift= min(raw_drift,1.0)
+        raw_drift= max(raw_drift,0.0)
+        if(t==0):
+            smoo_drift= raw_drift
+            result.append(smoo_drift)
+            continue
+        smoo_drift= alpha*raw_drift + (1-alpha)*result[-1]
+        result.append(smoo_drift)
+    return result
+
 
 
 def agreement_density(turns: list[Turn], window: int = 4) -> list[float]:
@@ -84,8 +109,31 @@ def agreement_density(turns: list[Turn], window: int = 4) -> list[float]:
     `window` turns. Detects validation loops (with flat novelty) and premature
     convergence (early spike + flat novelty + no drift).
     """
-    # NEXT: hand-write per spec 5.3
-    raise NotImplementedError("agreement_density() is hand-written — see spec section 5.3")
+    if(window<=0):
+            raise ValueError("window must be at least 1")
+    raw=[]
+    for t in range(len(turns)):
+        turn=turns[t]
+        if(turn.role=="user"):
+             markers= MARKERS["user_seeking"]
+        else:
+             markers= MARKERS["assistant_supplying"]
+        text = turn.text.lower()
+        count = 0
+        for marker in markers:
+            count += text.count(marker)
+        words=len(text.split())
+        score= count / words
+        raw.append(score)
+    result=[]
+    for t in range(len(raw)):
+        start= max(0, t-window+1)
+        chunk=raw[start:t+1]
+        average= sum(chunk)/len(chunk)
+        result.append(average)
+    return result
+        
+    
 
 
 def flag_failures(
@@ -103,5 +151,4 @@ def flag_failures(
     - drift: drift series exceeds cfg.drift_ceiling and its EMA slope over the
       last cfg.min_run turns is positive.
     """
-    # NEXT: hand-write per spec 5.4
-    raise NotImplementedError("flag_failures() is hand-written — see spec section 5.4")
+    raise NotImplementedError("flag_failures() is not implemented yet")

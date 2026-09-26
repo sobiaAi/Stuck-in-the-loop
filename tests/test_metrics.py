@@ -1,8 +1,8 @@
-"""Property tests for the hand-written metrics. No reimplementation here —
-only behavioral properties the definitions imply.
+"""Property tests for the metrics: behavioral properties the definitions
+imply, not reimplementations.
 
 These use synthetic unit vectors instead of real sentence embeddings so they
-run fast and offline. Until the metric bodies are written they skip cleanly.
+run fast and offline. Unimplemented metrics are skipped.
 """
 
 import numpy as np
