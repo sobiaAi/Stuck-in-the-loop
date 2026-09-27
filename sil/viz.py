@@ -8,6 +8,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
+from matplotlib.ticker import MaxNLocator
 
 from .loader import Transcript
 from .metrics import Flag
@@ -65,6 +66,7 @@ def render(
                 linewidth=0,
             )
 
+    axes[-1].xaxis.set_major_locator(MaxNLocator(integer=True))
     axes[-1].set_xlabel("Turn index", fontsize=11)
     axes[-1].set_xlim(-0.5, n - 0.5)
 
