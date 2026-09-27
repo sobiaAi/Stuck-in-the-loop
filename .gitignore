@@ -11,3 +11,4 @@ chart.png
 !docs/*.png
 .claude/
 private/
+eval/data/

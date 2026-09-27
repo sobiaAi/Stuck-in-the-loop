@@ -87,6 +87,28 @@ def render(
     plt.close(fig)
 
 
+def render_recurrence(transcript: Transcript, E, out_path: str) -> None:
+    """Save a recurrence plot: cell (i, j) is the cosine similarity of turns i and j."""
+    import numpy as np
+
+    S = np.clip(E @ E.T, 0.0, 1.0)
+    n = len(S)
+    fig, ax = plt.subplots(figsize=(8, 7), dpi=110, constrained_layout=True)
+    im = ax.imshow(S, cmap="magma", vmin=0.0, vmax=1.0, origin="upper")
+    ax.set_xlabel("Turn index", fontsize=11)
+    ax.set_ylabel("Turn index", fontsize=11)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    roles = "".join("U" if t.role == "user" else "A" for t in transcript.turns)
+    if n <= 40:
+        ax.set_xticks(range(n), [f"{i}{roles[i]}" for i in range(n)], fontsize=7, rotation=90)
+        ax.set_yticks(range(n), [f"{i}{roles[i]}" for i in range(n)], fontsize=7)
+    fig.colorbar(im, ax=ax, shrink=0.8, label="cosine similarity")
+    ax.set_title(f"{transcript.session_id} — recurrence plot", fontsize=13, fontweight="bold")
+    fig.savefig(out_path)
+    plt.close(fig)
+
+
 def summarize(flags: list[Flag]) -> str:
     """One line per flag: [VALIDATION LOOP] turns 8-14, severity 0.81."""
     if not flags:

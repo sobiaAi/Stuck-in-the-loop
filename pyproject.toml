@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+eval = ["pyarrow>=15"]
 
 [tool.setuptools]
 packages = ["sil"]

@@ -126,6 +126,28 @@ thresholds.json`) and were calibrated on the synthetic sessions in
 | `novelty_floor` | 0.30 |
 | `drift_ceiling` | 0.85 |
 
+## Evaluation on real conversations
+
+The thresholds above were set on four synthetic sessions, which is not
+evidence they generalize. Evaluation uses real conversations from
+[WildChat-1M](https://huggingface.co/datasets/allenai/WildChat-1M), labeled by
+hand under a written protocol ([`eval/LABELING.md`](eval/LABELING.md)):
+
+```bash
+pip install -e .[eval]
+python -m sil sample-wildchat train-00000-of-00014.parquet --n 60 --out eval
+# label eval/labels.csv by reading eval/data/<id>.md — before running the detector
+python -m sil evaluate eval                  # calibration half: tune freely
+python -m sil evaluate eval --split test     # held-out half: every run is logged
+```
+
+The calibration/test split is fixed when the sample is drawn, before anything
+is labeled, and every evaluation on the test half is recorded in
+`eval/test_log.csv`.
+
+`--recurrence plot.png` on `analyze` also saves the conversation's recurrence
+plot (cosine similarity between every pair of turns).
+
 ## Limitations (v0.1)
 
 - Agreement markers are lexical, heuristic, and English-only.

@@ -1,8 +1,10 @@
 """Command-line interface.
 
     python -m sil analyze CHAT [--goal TEXT] [--conversation N|TITLE]
-                               [--out chart.png] [--config path]
+                               [--out chart.png] [--recurrence plot.png] [--config path]
     python -m sil list CHAT
+    python -m sil sample-wildchat SHARD.parquet [--n 60] [--seed 7] [--out eval]
+    python -m sil evaluate [EVAL_DIR] [--split calibration|test] [--config path] [-v]
 
 CHAT can be stuck-in-the-loop JSON, a ChatGPT or Claude data export
 (conversations.json), or pasted text/markdown with speaker labels.
@@ -69,9 +71,13 @@ def _cmd_analyze(args) -> int:
     # Imported late so bad input fails fast without paying the model-load cost.
     from . import metrics
     from .embed import embed_text, embed_turns
-    from .viz import render, summarize
+    from .viz import render, render_recurrence, summarize
 
     E = embed_turns(transcript.turns, session_id=transcript.session_id)
+    if args.recurrence:
+        render_recurrence(transcript, E, args.recurrence)
+        print(f"recurrence plot saved to {args.recurrence}")
+
     goal_embedding = _goal_embedding(transcript, E, metrics, embed_text)
     if goal_embedding is None:
         print(
@@ -102,6 +108,41 @@ def _cmd_analyze(args) -> int:
     return 0
 
 
+def _cmd_sample(args) -> int:
+    from .wildchat import export_sample, read_candidates
+
+    candidates = read_candidates(
+        args.shard, min_user_turns=args.min_user_turns, max_user_turns=args.max_user_turns
+    )
+    print(f"{len(candidates)} conversations qualify "
+          f"({args.min_user_turns}–{args.max_user_turns} user turns, English, non-toxic, deduplicated)")
+    try:
+        export_sample(candidates, args.n, args.seed, args.out)
+    except (FileExistsError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    print(f"sampled {args.n} into {args.out}/ — {args.n // 2} calibration, "
+          f"{args.n - args.n // 2} test (split locked in {args.out}/split.json)")
+    print(f"label them in {args.out}/labels.csv, reading {args.out}/data/<id>.md")
+    return 0
+
+
+def _cmd_evaluate(args) -> int:
+    from .evaluate import evaluate, log_test_run, report
+
+    cfg = _load_config(args.config)
+    result = evaluate(args.eval_dir, split=args.split, cfg=cfg)
+    if result.n_chats == 0:
+        print(f"no labeled chats in the {args.split} half yet", file=sys.stderr)
+        return 1
+    print(report(result, verbose=args.verbose))
+    if args.split == "test":
+        n = log_test_run(args.eval_dir, result, cfg)
+        print(f"\ntest set evaluated {n} time{'s' if n != 1 else ''} so far "
+              f"(logged in {args.eval_dir}/test_log.csv)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="sil",
@@ -124,13 +165,34 @@ def main(argv: list[str] | None = None) -> int:
         "--out", default="chart.png", help="Output chart path (default: chart.png)"
     )
     analyze.add_argument(
+        "--recurrence", default=None, help="Also save a recurrence plot to this path"
+    )
+    analyze.add_argument(
         "--config", default=None, help="Path to a JSON file overriding Config defaults"
     )
 
     lst = sub.add_parser("list", help="List the conversations in a file")
     lst.add_argument("chat")
 
+    sample = sub.add_parser("sample-wildchat", help="Draw a labeling sample from a WildChat shard")
+    sample.add_argument("shard", help="One WildChat-1M parquet file")
+    sample.add_argument("--n", type=int, default=60)
+    sample.add_argument("--seed", type=int, default=7)
+    sample.add_argument("--out", default="eval")
+    sample.add_argument("--min-user-turns", type=int, default=6)
+    sample.add_argument("--max-user-turns", type=int, default=20)
+
+    ev = sub.add_parser("evaluate", help="Score the detector against hand labels")
+    ev.add_argument("eval_dir", nargs="?", default="eval")
+    ev.add_argument("--split", choices=["calibration", "test"], default="calibration")
+    ev.add_argument("--config", default=None)
+    ev.add_argument("-v", "--verbose", action="store_true", help="Show every chat")
+
     args = parser.parse_args(argv)
-    if args.command == "list":
-        return _cmd_list(args)
-    return _cmd_analyze(args)
+    handlers = {
+        "list": _cmd_list,
+        "analyze": _cmd_analyze,
+        "sample-wildchat": _cmd_sample,
+        "evaluate": _cmd_evaluate,
+    }
+    return handlers[args.command](args)
