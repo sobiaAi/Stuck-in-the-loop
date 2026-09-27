@@ -30,6 +30,7 @@ from .loader import Transcript, TranscriptError, Turn, load_transcript
 USER_LABELS = ["you said", "user", "you", "human", "me"]
 ASSISTANT_LABELS = [
     "chatgpt said",
+    "ai assistant",
     "assistant",
     "chatgpt",
     "claude",

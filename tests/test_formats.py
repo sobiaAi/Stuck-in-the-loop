@@ -155,6 +155,20 @@ def test_pasted_inline_and_markdown_labels(tmp_path):
     ]
 
 
+def test_bold_human_and_ai_assistant_labels(tmp_path):
+    text = (
+        "**Human:**\n\nwhich mask is better?\n\n"
+        "**AI Assistant:**\n\nthe second one\n\n"
+        "**Human:**\n\nwhy?\n"
+    )
+    t = load_any(write(tmp_path, "chat.md", text))
+    assert [(x.role, x.text) for x in t.turns] == [
+        ("user", "which mask is better?"),
+        ("assistant", "the second one"),
+        ("user", "why?"),
+    ]
+
+
 def test_ordinary_sentences_are_not_labels(tmp_path):
     text = "User: you can see the bug here\nyou know what I mean\nAssistant: yes"
     t = load_any(write(tmp_path, "chat.txt", text))
