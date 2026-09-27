@@ -10,3 +10,4 @@ chart.png
 *.png
 !docs/*.png
 .claude/
+private/
