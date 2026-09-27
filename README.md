@@ -35,9 +35,22 @@ Output: a trajectory chart (three stacked series — novelty, drift, agreement �
 with flagged regions shaded) plus a text summary:
 
 ```
-[VALIDATION LOOP] turns 8–14, severity 0.81
+[VALIDATION LOOP] turns 4–17, severity 0.78
 chart saved to chart.png
 ```
+
+![Trajectory chart of the validation-loop example](docs/validation_loop.png)
+
+Results on the four example sessions in `examples/`:
+
+| Session | Verdict |
+|---|---|
+| validation loop | `[VALIDATION LOOP] turns 4–17, severity 0.78` |
+| premature convergence | `[PREMATURE CONVERGENCE] turns 10–17, severity 0.44` |
+| drift | `[DRIFT] turns 11–19, severity 0.45` |
+| healthy (control) | no failure modes detected |
+
+Charts for all four are in [`docs/`](docs/).
 
 ## Input formats
 
@@ -74,25 +87,53 @@ the `goal` field of the JSON format.
 
 ## How detection works
 
-| Failure mode | Signal signature |
+Each turn gets three signals:
+
+- **Novelty** — `1 − max cosine similarity` to the previous 3 turns, clamped
+  to [0, 1]. Max rather than mean: a turn that repeats *any* recent turn is
+  repetitive, even if it differs from the others.
+- **Drift** — `1 − cosine similarity` to the session goal, smoothed with an
+  exponential moving average (α = 0.3) so a single tangent doesn't count;
+  only a sustained move away does.
+- **Agreement density** — agreement markers per word, counted separately for
+  agreement-*seeking* user turns ("right?", "am I correct") and
+  agreement-*supplying* assistant turns ("exactly", "you're right"), then
+  averaged over the last 4 turns. A validation loop needs both sides.
+
+Raw novelty alternates turn to turn, because each turn is also compared with
+the other speaker's message, so the rules use its average over the last 4
+turns.
+
+| Failure mode | Rule (for at least 4 consecutive turns) |
 |---|---|
-| Validation loop | novelty flatlines below floor while agreement density stays high on both sides |
-| Premature convergence | novelty drops early and stays down, drift stays low — converged, just too early |
-| Drift | drift-from-goal series trends upward without recovering |
+| Validation loop | agreement > 0.03 and smoothed novelty < 0.45 |
+| Drift | drift > 0.85, and it doesn't come back down |
+| Premature convergence | smoothed novelty < 0.30 through the end of the session, with agreement ≤ 0.03 |
 
-Novelty is `1 − max cosine similarity` to the last few turns; drift is
-`1 − cosine similarity` to the declared goal, EMA-smoothed; agreement density
-is a lexical marker score computed separately for agreement-*seeking* (user)
-and agreement-*supplying* (assistant) turns, since a validation loop requires
-both sides.
+Severity is the fraction of the session the flagged span covers. Thresholds
+live in the `Config` dataclass (override any of them with `--config
+thresholds.json`) and were calibrated on the synthetic sessions in
+`examples/`:
 
-Thresholds live in a `Config` dataclass and were calibrated on the synthetic
-sessions in `examples/`.
+| Setting | Value |
+|---|---|
+| `novelty_window` | 3 |
+| `agreement_window` | 4 |
+| `drift_alpha` | 0.3 |
+| `min_run` | 4 |
+| `agreement_ceiling` | 0.03 |
+| `loop_novelty_max` | 0.45 |
+| `novelty_floor` | 0.30 |
+| `drift_ceiling` | 0.85 |
 
 ## Limitations (v0.1)
 
 - Agreement markers are lexical, heuristic, and English-only.
-- Thresholds are hand-calibrated on synthetic sessions, not learned.
+- Thresholds are hand-calibrated on four synthetic sessions, not learned —
+  evaluation on real conversations is the next step.
+- Drift measures topical distance from the goal, not usefulness: a turn that
+  serves the goal indirectly (e.g. setting an alarm to study earlier) still
+  reads as drift.
 - The goal must be supplied and is trusted as given; inferring it from early
   turns, and telling a deliberate change of goal apart from drift, is future work.
 - Offline analysis only — real-time monitoring is planned for v0.2.

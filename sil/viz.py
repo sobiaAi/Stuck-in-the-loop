@@ -42,16 +42,18 @@ def render(
         3, 1, sharex=True, figsize=(14, 8), dpi=110, constrained_layout=True
     )
 
+    # agreement is markers per word, so it lives near 0.0–0.1; a 0–1 axis flattens it
+    agreement_top = max(0.1, 1.25 * max(agreement_s, default=0.0))
     series = [
-        (novelty_s, "Novelty", "#1f77b4"),
-        (drift_s, "Drift from goal", "#2ca02c"),
-        (agreement_s, "Agreement density", "#7f7f7f"),
+        (novelty_s, "Novelty", "#1f77b4", 1.0),
+        (drift_s, "Drift from goal", "#2ca02c", 1.0),
+        (agreement_s, "Agreement density", "#7f7f7f", agreement_top),
     ]
 
-    for ax, (values, label, color) in zip(axes, series):
+    for ax, (values, label, color, top) in zip(axes, series):
         ax.plot(x, values, color=color, linewidth=2, marker="o", markersize=3.5)
         ax.set_ylabel(label, fontsize=11)
-        ax.set_ylim(-0.05, 1.05)
+        ax.set_ylim(-0.05 * top, 1.05 * top)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         for flag in flags:
