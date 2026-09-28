@@ -56,5 +56,19 @@ without the user supplying new evidence. Reversing because of new evidence
 ## Data
 
 Conversations are sampled from [WildChat-1M](https://huggingface.co/datasets/allenai/WildChat-1M)
-(Zhao et al., 2024; ODC-BY). The conversation texts in `data/` are not
-committed; `sil sample-wildchat` regenerates them from the same shard and seed.
+(Zhao et al., 2024; ODC-BY), shard `train-00000-of-00014.parquet`, seed 7.
+
+Inclusion criteria, fixed before labeling:
+
+- tagged English and not toxic in the dataset
+- 6–20 user turns (12–40 messages)
+- the user's messages are at least 90% Latin-alphabet letters (the dataset's
+  language tag lets through some conversations written mostly in other scripts)
+- one conversation per distinct opening message (the dataset has many
+  repeated prompts)
+
+60 conversations are drawn at random from those that qualify; 30 become the
+calibration half and 30 the held-out test half.
+
+The conversation texts in `data/` are not committed; `sil sample-wildchat`
+regenerates them from the same shard and seed.

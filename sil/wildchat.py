@@ -44,13 +44,25 @@ def _turns(conversation) -> list[Turn]:
     return turns
 
 
+def _latin_share(text: str) -> float:
+    letters = [c for c in text if c.isalpha()]
+    if not letters:
+        return 0.0
+    return sum(c.isascii() for c in letters) / len(letters)
+
+
 def read_candidates(
     parquet_path: str,
     min_user_turns: int = 6,
     max_user_turns: int = 20,
     language: str = "English",
+    min_latin_share: float = 0.9,
 ) -> list[Transcript]:
-    """Long, non-toxic conversations in one language, one per distinct opening message."""
+    """Long, non-toxic conversations in one language, one per distinct opening message.
+
+    Conversations whose user messages are less than `min_latin_share` Latin
+    letters are dropped as well.
+    """
     import pyarrow.parquet as pq
 
     table = pq.read_table(
@@ -63,17 +75,38 @@ def read_candidates(
             ("turn", "<=", max_user_turns),
         ],
     )
+    import pyarrow.compute as pc
+
+    # Only role and content are read from each message: the messages also carry
+    # timezone-aware timestamps, which need tz data to convert and aren't used.
+    conversations = table.column("conversation").combine_chunks()
+    messages = conversations.flatten()
+    roles = messages.field("role").to_pylist()
+    contents = messages.field("content").to_pylist()
+    lengths = pc.list_value_length(conversations).to_pylist()
+    hashes = table.column("conversation_hash").to_pylist()
+
     seen_openings: set[str] = set()
     out: list[Transcript] = []
-    for row in table.to_pylist():
-        turns = _turns(row["conversation"])
+    start = 0
+    for conv_hash, length in zip(hashes, lengths):
+        conversation = [
+            {"role": roles[j], "content": contents[j]} for j in range(start, start + length)
+        ]
+        start += length
+        turns = _turns(conversation)
         if len(turns) < 2 * min_user_turns or turns[0].role != "user":
+            continue
+        # WildChat's language tag misses conversations whose user side is
+        # largely another script (e.g. English code with Chinese requests).
+        user_text = " ".join(t.text for t in turns if t.role == "user")
+        if _latin_share(user_text) < min_latin_share:
             continue
         opening = " ".join(turns[0].text.lower().split())[:300]
         if opening in seen_openings:
             continue
         seen_openings.add(opening)
-        out.append(Transcript(session_id=f"wc-{row['conversation_hash'][:12]}", goal=None, turns=turns))
+        out.append(Transcript(session_id=f"wc-{conv_hash[:12]}", goal=None, turns=turns))
     out.sort(key=lambda t: t.session_id)
     return out
 

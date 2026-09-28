@@ -28,6 +28,7 @@ def make_shard(tmp_path):
         ("h" + "f" * 31, conv("rude", 7), 7, "English", True),
         ("h" + "g" * 31, conv("write a poem", 6), 6, "English", False),
         ("h" + "i" * 31, conv("learn spectral graphs", 10), 10, "English", False),
+        ("h" + "j" * 31, conv("翻译接下来的话，请把这些句子翻译成英文，谢谢你的帮助", 7), 7, "English", False),
     ]
     table = pa.table({
         "conversation_hash": [r[0] for r in rows],
