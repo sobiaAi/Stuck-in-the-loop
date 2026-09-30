@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "stuck-in-the-loop"
 version = "0.1.0"
-description = "Detects validation loops, premature convergence, and drift in human-AI conversation transcripts by modeling the session as a trajectory through a state space."
+description = "Detects when a human-AI conversation gets stuck (validation loops, premature convergence, drift)"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"

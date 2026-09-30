@@ -1,21 +1,20 @@
 # stuck-in-the-loop
 
-Human-AI conversations have trajectories. Some converge on useful output; others
-decay into recognizable failure patterns without either party noticing:
+Detects when a human-AI conversation stops being productive.
 
-1. **Validation loop** — the user seeks agreement, the AI supplies it, and
-   information content flatlines. Turns keep happening; nothing new enters the
-   session.
-2. **Premature convergence** — both parties lock onto an early, mediocre
-   solution and stop exploring the space.
-3. **Drift** — the session wanders progressively further from its stated goal
-   without converging on anything.
+Some chats with an AI go somewhere useful. Others get stuck, and usually
+neither side notices. This tool looks for three patterns:
 
-stuck-in-the-loop treats a session as a discrete dynamical system: each turn
-updates a small state vector of measurable signals — novelty, drift from goal,
-agreement density — and failure modes appear as characteristic patterns in the
-state trajectory. v0.1 analyzes transcripts offline and renders a trajectory
-chart with flagged regions.
+1. **Validation loop**: the user keeps asking for agreement, the AI keeps
+   giving it, and nothing new gets said.
+2. **Premature convergence**: both sides settle on the first answer and stop
+   looking at other options.
+3. **Drift**: the chat slowly moves away from what it was supposed to be about
+   and never comes back.
+
+The idea is to treat a conversation like a dynamical system. Every turn gets a
+few numbers (novelty, drift from the goal, agreement) and the failures show up
+as patterns in how those numbers change over the conversation.
 
 ## Install
 
@@ -31,53 +30,50 @@ pip install -e .
 python -m sil analyze examples/validation_loop.json --out chart.png
 ```
 
-Output: a trajectory chart (three stacked series — novelty, drift, agreement —
-with flagged regions shaded) plus a text summary:
+This saves a chart (novelty, drift and agreement per turn, with flagged turns
+shaded) and prints what it found:
 
 ```
-[VALIDATION LOOP] turns 4–17, severity 0.78
+[VALIDATION LOOP] turns 4-17, severity 0.78
 chart saved to chart.png
 ```
 
-![Trajectory chart of the validation-loop example](docs/validation_loop.png)
+![chart for the validation loop example](docs/validation_loop.png)
 
-Results on the four example sessions in `examples/`:
+Results on the four example chats in `examples/`:
 
-| Session | Verdict |
+| Chat | Result |
 |---|---|
-| validation loop | `[VALIDATION LOOP] turns 4–17, severity 0.78` |
-| premature convergence | `[PREMATURE CONVERGENCE] turns 10–17, severity 0.44` |
-| drift | `[DRIFT] turns 11–19, severity 0.45` |
-| healthy (control) | no failure modes detected |
+| validation loop | `[VALIDATION LOOP] turns 4-17, severity 0.78` |
+| premature convergence | `[PREMATURE CONVERGENCE] turns 10-17, severity 0.44` |
+| drift | `[DRIFT] turns 11-19, severity 0.45` |
+| healthy | nothing flagged |
 
-Charts for all four are in [`docs/`](docs/).
+All four charts are in [`docs/`](docs/).
 
 ## Input formats
 
-`CHAT` can be any of:
-
 | Format | How to get it |
 |---|---|
-| **ChatGPT export** | Settings → Data controls → Export data; use `conversations.json` from the zip |
-| **Claude export** | Settings → Privacy → Export data; use `conversations.json` |
-| **Pasted text** (`.txt` / `.md`) | Copy a chat and save it. Messages start with a speaker label: `You said:` / `ChatGPT said:`, `User:` / `Assistant:`, or `## User` / `## Assistant` |
-| **stuck-in-the-loop JSON** | See below |
+| ChatGPT export | Settings > Data controls > Export data, then use `conversations.json` from the zip |
+| Claude export | Settings > Privacy > Export data, then use `conversations.json` |
+| Pasted text (`.txt` / `.md`) | copy a chat into a file. each message starts with `You said:` / `ChatGPT said:`, `User:` / `Assistant:`, or `## User` / `## Assistant` |
+| json | format below |
 
-Export files hold every conversation you've had. List them, then pick one by
-index or by part of its title:
+Export files have all your chats in them. List them and pick one by number or
+part of the title:
 
 ```bash
 python -m sil list conversations.json
-python -m sil analyze conversations.json --conversation "study plan" --goal "Build a two-week study plan"
+python -m sil analyze conversations.json --conversation "study plan" --goal "make a 2 week study plan"
 ```
 
-Drift is measured against the session's goal. Give it with `--goal`, or in
-the `goal` field of the JSON format.
+Drift is measured against the goal, so give one with `--goal` or in the json:
 
 ```json
 {
-  "session_id": "my-session",
-  "goal": "optional: one-sentence statement of what the session is trying to achieve",
+  "session_id": "my-chat",
+  "goal": "what the chat is trying to do (optional)",
   "turns": [
     {"role": "user", "text": "..."},
     {"role": "assistant", "text": "..."}
@@ -85,35 +81,30 @@ the `goal` field of the JSON format.
 }
 ```
 
-## How detection works
+## How it works
 
-Each turn gets three signals:
+Each turn gets three numbers:
 
-- **Novelty** — `1 − max cosine similarity` to the previous 3 turns, clamped
-  to [0, 1]. Max rather than mean: a turn that repeats *any* recent turn is
-  repetitive, even if it differs from the others.
-- **Drift** — `1 − cosine similarity` to the session goal, smoothed with an
-  exponential moving average (α = 0.3) so a single tangent doesn't count;
-  only a sustained move away does.
-- **Agreement density** — agreement markers per word, counted separately for
-  agreement-*seeking* user turns ("right?", "am I correct") and
-  agreement-*supplying* assistant turns ("exactly", "you're right"), then
-  averaged over the last 4 turns. A validation loop needs both sides.
+- **Novelty**: `1 - max cosine similarity` to the previous 3 turns (sentence
+  embeddings, all-MiniLM-L6-v2). Max instead of mean, because repeating any one
+  recent turn is enough to count as repetitive.
+- **Drift**: `1 - cosine similarity` to the goal, smoothed with an EMA
+  (alpha = 0.3) so one tangent doesn't count, only a steady move away.
+- **Agreement**: agreement phrases per word. User turns are checked for
+  seeking agreement ("right?", "am I correct"), AI turns for giving it
+  ("exactly", "you're right"). Averaged over the last 4 turns.
 
-Raw novelty alternates turn to turn, because each turn is also compared with
-the other speaker's message, so the rules use its average over the last 4
-turns.
+Novelty zig-zags between the user and the AI, so the rules use its average
+over the last 4 turns.
 
-| Failure mode | Rule (for at least 4 consecutive turns) |
+| Failure | Rule (at least 4 turns in a row) |
 |---|---|
-| Validation loop | agreement > 0.03 and smoothed novelty < 0.45 |
-| Drift | drift > 0.85, and it doesn't come back down |
-| Premature convergence | smoothed novelty < 0.30 through the end of the session, with agreement ≤ 0.03 |
+| validation loop | agreement > 0.03 and novelty < 0.45 |
+| drift | drift > 0.85 and it doesn't come back down |
+| premature convergence | novelty < 0.30 until the end, agreement <= 0.03 |
 
-Severity is the fraction of the session the flagged span covers. Thresholds
-live in the `Config` dataclass (override any of them with `--config
-thresholds.json`) and were calibrated on the synthetic sessions in
-`examples/`:
+Severity is the share of the chat that got flagged. The thresholds are in
+`Config` in `sil/metrics.py` and can be changed with `--config thresholds.json`.
 
 | Setting | Value |
 |---|---|
@@ -126,39 +117,36 @@ thresholds.json`) and were calibrated on the synthetic sessions in
 | `novelty_floor` | 0.30 |
 | `drift_ceiling` | 0.85 |
 
-## Evaluation on real conversations
+## Evaluation on real chats
 
-The thresholds above were set on four synthetic sessions, which is not
-evidence they generalize. Evaluation uses real conversations from
+The thresholds were set on four made-up chats, which doesn't show they work on
+real ones. So the evaluation uses real conversations from
 [WildChat-1M](https://huggingface.co/datasets/allenai/WildChat-1M), labeled by
-hand under a written protocol ([`eval/LABELING.md`](eval/LABELING.md)):
+hand following [`eval/LABELING.md`](eval/LABELING.md).
 
 ```bash
 pip install -e .[eval]
 python -m sil sample-wildchat train-00000-of-00014.parquet --n 60 --out eval
-# label eval/labels.csv by reading eval/data/<id>.md — before running the detector
-python -m sil evaluate eval                  # calibration half: tune freely
-python -m sil evaluate eval --split test     # held-out half: every run is logged
+# label eval/labels.csv first, before running the detector on them
+python -m sil evaluate eval                  # calibration half, used for tuning
+python -m sil evaluate eval --split test     # test half, every run gets logged
 ```
 
-The calibration/test split is fixed when the sample is drawn, before anything
-is labeled, and every evaluation on the test half is recorded in
-`eval/test_log.csv`.
+The calibration/test split is made when the sample is drawn, before any
+labeling, and every run on the test half is logged in `eval/test_log.csv`.
 
-`--recurrence plot.png` on `analyze` also saves the conversation's recurrence
-plot (cosine similarity between every pair of turns).
+`analyze` also takes `--recurrence plot.png` to save a recurrence plot (the
+similarity between every pair of turns).
 
-## Limitations (v0.1)
+## Limitations
 
-- Agreement markers are lexical, heuristic, and English-only.
-- Thresholds are hand-calibrated on four synthetic sessions, not learned —
-  evaluation on real conversations is the next step.
-- Drift measures topical distance from the goal, not usefulness: a turn that
-  serves the goal indirectly (e.g. setting an alarm to study earlier) still
-  reads as drift.
-- The goal must be supplied and is trusted as given; inferring it from early
-  turns, and telling a deliberate change of goal apart from drift, is future work.
-- Offline analysis only — real-time monitoring is planned for v0.2.
+- the agreement phrases are a fixed English list
+- thresholds come from four made-up chats, real evaluation is in progress
+- drift measures how far the topic is from the goal, not whether it's useful.
+  asking about an alarm clock to wake up and study still counts as drift
+- the goal has to be given. guessing it from the first few turns, and telling
+  a deliberate topic change apart from drift, is future work
+- works on finished chats only for now, not live
 
 ## License
 

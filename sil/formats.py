@@ -1,21 +1,11 @@
-"""Read conversations from several formats into a Transcript.
+"""Reads chats from different formats.
 
-Supported inputs:
-- stuck-in-the-loop JSON  ({"session_id", "goal"?, "turns": [...]})
-- ChatGPT data export     (conversations.json — list of conversations with a
-                           "mapping" message tree)
-- Claude data export      (conversations.json — list of conversations with
-                           "chat_messages")
-- Pasted plain text / markdown with speaker labels, e.g.
-      You said: ...            User: ...           ## User
-      ChatGPT said: ...        Assistant: ...      ## Assistant
+- our own json
+- chatgpt export (conversations.json)
+- claude export (conversations.json)
+- pasted text with labels like "User:", "You said:", "## Assistant"
 
-Consecutive messages from the same speaker are merged into one turn (an
-assistant reply split around tool calls is still one turn).
-
-Export files hold many conversations; pick one with `conversation=` (a
-0-based index or a case-insensitive title substring). `list_conversations`
-shows what's in a file.
+messages in a row from the same speaker become one turn.
 """
 
 from __future__ import annotations
@@ -42,9 +32,9 @@ ASSISTANT_LABELS = [
 
 _ALL_LABELS = sorted(USER_LABELS + ASSISTANT_LABELS, key=len, reverse=True)
 _LABEL_ALT = "|".join(re.escape(label) for label in _ALL_LABELS)
-# "User: text"  /  "**ChatGPT said:** text"  /  "> Assistant: text"
+# "User: text", "**ChatGPT said:** text"
 _INLINE = re.compile(rf"^[\s>#*_]*({_LABEL_ALT})[\s*_]*:[\s*_]*(.*)$", re.IGNORECASE)
-# a line that is only a label: "## User", "**Assistant**", "You said"
+# label alone on a line: "## User", "You said"
 _BARE = re.compile(rf"^[\s>#*_]*({_LABEL_ALT})[\s*_]*$", re.IGNORECASE)
 
 
@@ -77,13 +67,11 @@ def _merge(pairs: list[tuple[str, str]]) -> list[Turn]:
     return turns
 
 
-# --- ChatGPT export -------------------------------------------------------
-
 def _chatgpt_pairs(conv: dict) -> list[tuple[str, str]]:
     mapping = conv.get("mapping") or {}
     node_id = conv.get("current_node")
     if node_id not in mapping:
-        # no current_node: follow first children from the root
+        # no current_node, just follow the first child from the root
         roots = [k for k, v in mapping.items() if not v.get("parent")]
         chain, node_id = [], roots[0] if roots else None
         while node_id:
@@ -116,8 +104,6 @@ def _chatgpt_pairs(conv: dict) -> list[tuple[str, str]]:
     return pairs
 
 
-# --- Claude export --------------------------------------------------------
-
 def _claude_pairs(conv: dict) -> list[tuple[str, str]]:
     pairs = []
     for msg in conv.get("chat_messages") or []:
@@ -134,8 +120,6 @@ def _claude_pairs(conv: dict) -> list[tuple[str, str]]:
         pairs.append((role, text))
     return pairs
 
-
-# --- pasted text ----------------------------------------------------------
 
 def _text_pairs(raw: str) -> list[tuple[str, str]]:
     pairs: list[tuple[str, str]] = []
@@ -155,10 +139,8 @@ def _text_pairs(raw: str) -> list[tuple[str, str]]:
     return pairs
 
 
-# --- dispatch -------------------------------------------------------------
-
 def _detect(data) -> tuple[str, list[dict]] | None:
-    """Return (kind, conversations) for export formats, None otherwise."""
+    # None means it's not an export file
     items = data if isinstance(data, list) else [data]
     if not items or not all(isinstance(c, dict) for c in items):
         return None
@@ -179,13 +161,13 @@ def _pick(convs: list[dict], kind: str, conversation, path: str) -> tuple[int, d
         if len(convs) == 1:
             return 0, convs[0]
         raise TranscriptError(
-            f"{path} holds {len(convs)} conversations — choose one with "
-            f"--conversation (index or title). Run `python -m sil list {path}` to see them."
+            f"{path} has {len(convs)} conversations, pick one with --conversation "
+            f"(number or title). `python -m sil list {path}` shows them."
         )
     if isinstance(conversation, int) or str(conversation).isdigit():
         i = int(conversation)
         if not 0 <= i < len(convs):
-            raise TranscriptError(f"--conversation {i} is out of range (0–{len(convs) - 1})")
+            raise TranscriptError(f"--conversation {i} is out of range (0-{len(convs) - 1})")
         return i, convs[i]
     needle = str(conversation).lower()
     hits = [(i, c) for i, c in enumerate(convs) if needle in _title(kind, c, i).lower()]
@@ -211,8 +193,6 @@ def _finish(session_id: str, goal: str | None, turns: list[Turn], path: str) -> 
 
 
 def list_conversations(path: str) -> list[ConversationInfo]:
-    """List the conversations in a file (a single entry for non-export formats)."""
-    t = None
     if Path(path).suffix.lower() == ".json":
         detected = _detect(_read_json(path))
         if detected:
@@ -227,11 +207,7 @@ def list_conversations(path: str) -> list[ConversationInfo]:
 
 
 def load_any(path: str, conversation=None, goal: str | None = None) -> Transcript:
-    """Load a conversation from any supported format.
-
-    `goal` overrides whatever goal the file has. Formats with no goal field
-    (exports, pasted text) come back with goal=None unless one is passed.
-    """
+    """`goal` overrides the file's goal. exports/pasted text have no goal otherwise."""
     p = Path(path)
     if not p.is_file():
         raise TranscriptError(f"Transcript file not found: {path}")
@@ -251,8 +227,8 @@ def load_any(path: str, conversation=None, goal: str | None = None) -> Transcrip
         pairs = _text_pairs(raw)
         if not pairs:
             raise TranscriptError(
-                f"{path}: no speaker labels found. Start each message with a label "
-                "like 'User:' / 'Assistant:' (or 'You said:' / 'ChatGPT said:')."
+                f"{path}: no speaker labels found. start each message with "
+                "'User:' / 'Assistant:' (or 'You said:' / 'ChatGPT said:')"
             )
         t = _finish(_slug(p.stem), None, _merge(pairs), path)
 

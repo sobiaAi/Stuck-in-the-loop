@@ -1,7 +1,4 @@
-"""End-to-end: each example transcript triggers its intended flag; the healthy
-transcript triggers none. Needs sentence-transformers (downloads the model on
-first run) and a complete detection engine; skips if either is missing.
-"""
+"""each example should get its own flag, the healthy one none. needs the model."""
 
 from pathlib import Path
 
@@ -22,13 +19,10 @@ def analyze(name):
     E = embed_turns(t.turns, session_id=t.session_id)
     goal = embed_text(t.goal)
     cfg = Config()
-    try:
-        novelty_s = metrics.novelty(E, window=cfg.novelty_window)
-        drift_s = metrics.drift(E, goal, alpha=cfg.drift_alpha)
-        agreement_s = metrics.agreement_density(t.turns, window=cfg.agreement_window)
-        return metrics.flag_failures(novelty_s, drift_s, agreement_s, cfg)
-    except NotImplementedError:
-        pytest.skip("metrics not implemented yet")
+    novelty_s = metrics.novelty(E, window=cfg.novelty_window)
+    drift_s = metrics.drift(E, goal, alpha=cfg.drift_alpha)
+    agreement_s = metrics.agreement_density(t.turns, window=cfg.agreement_window)
+    return metrics.flag_failures(novelty_s, drift_s, agreement_s, cfg)
 
 
 def modes(flags):

@@ -1,14 +1,10 @@
-"""Transcript loading and validation.
+"""Loads transcript json files.
 
-Transcript JSON schema:
-
+format:
     {
-      "session_id": "string",
-      "goal": "optional — one sentence stating what the session is trying to achieve",
-      "turns": [
-        {"role": "user",      "text": "..."},
-        {"role": "assistant", "text": "..."}
-      ]
+      "session_id": "...",
+      "goal": "...",        (optional)
+      "turns": [{"role": "user", "text": "..."}, {"role": "assistant", "text": "..."}]
     }
 """
 
@@ -22,7 +18,7 @@ VALID_ROLES = {"user", "assistant"}
 
 
 class TranscriptError(Exception):
-    """Raised when a transcript file is missing, malformed, or invalid."""
+    pass
 
 
 @dataclass
@@ -40,12 +36,7 @@ class Transcript:
 
 
 def load_transcript(path: str) -> Transcript:
-    """Load and validate a transcript JSON file.
-
-    Raises TranscriptError with a clear message on any violation:
-    missing file, invalid JSON, empty goal (a missing goal is fine and
-    loads as None), empty turns, or a role other than 'user'/'assistant'.
-    """
+    """Raises TranscriptError if anything is wrong. Missing goal -> None."""
     p = Path(path)
     if not p.is_file():
         raise TranscriptError(f"Transcript file not found: {path}")
@@ -65,8 +56,7 @@ def load_transcript(path: str) -> Transcript:
     goal = raw.get("goal")
     if goal is not None and (not isinstance(goal, str) or not goal.strip()):
         raise TranscriptError(
-            f"{path}: 'goal' must be a non-empty string when present — "
-            "leave it out entirely to have it inferred"
+            f"{path}: 'goal' can't be empty (leave it out if there isn't one)"
         )
 
     raw_turns = raw.get("turns")

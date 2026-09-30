@@ -1,13 +1,8 @@
-"""Command-line interface.
-
-    python -m sil analyze CHAT [--goal TEXT] [--conversation N|TITLE]
-                               [--out chart.png] [--recurrence plot.png] [--config path]
-    python -m sil list CHAT
-    python -m sil sample-wildchat SHARD.parquet [--n 60] [--seed 7] [--out eval]
-    python -m sil evaluate [EVAL_DIR] [--split calibration|test] [--config path] [-v]
-
-CHAT can be stuck-in-the-loop JSON, a ChatGPT or Claude data export
-(conversations.json), or pasted text/markdown with speaker labels.
+"""
+python -m sil analyze CHAT [--goal TEXT] [--conversation N|TITLE] [--out chart.png]
+python -m sil list CHAT
+python -m sil sample-wildchat SHARD.parquet [--n 60] [--seed 7]
+python -m sil evaluate [EVAL_DIR] [--split calibration|test]
 """
 
 from __future__ import annotations
@@ -68,7 +63,7 @@ def _cmd_analyze(args) -> int:
 
     cfg = _load_config(args.config)
 
-    # Imported late so bad input fails fast without paying the model-load cost.
+    # imported here so bad input fails before the model loads
     from . import metrics
     from .embed import embed_text, embed_turns
     from .viz import render, render_recurrence, summarize
@@ -80,27 +75,13 @@ def _cmd_analyze(args) -> int:
 
     goal_embedding = _goal_embedding(transcript, E, metrics, embed_text)
     if goal_embedding is None:
-        print(
-            "error: this chat has no goal. Pass one with --goal \"...\" "
-            "(goal inference isn't implemented yet).",
-            file=sys.stderr,
-        )
+        print('error: this chat has no goal, pass one with --goal "..."', file=sys.stderr)
         return 1
 
-    try:
-        novelty_s = metrics.novelty(E, window=cfg.novelty_window)
-        drift_s = metrics.drift(E, goal_embedding, alpha=cfg.drift_alpha)
-        agreement_s = metrics.agreement_density(
-            transcript.turns, window=cfg.agreement_window
-        )
-        flags = metrics.flag_failures(novelty_s, drift_s, agreement_s, cfg)
-    except NotImplementedError as e:
-        print(
-            f"error: {e}\n"
-            "The detection engine (sil/metrics.py) is not finished yet.",
-            file=sys.stderr,
-        )
-        return 2
+    novelty_s = metrics.novelty(E, window=cfg.novelty_window)
+    drift_s = metrics.drift(E, goal_embedding, alpha=cfg.drift_alpha)
+    agreement_s = metrics.agreement_density(transcript.turns, window=cfg.agreement_window)
+    flags = metrics.flag_failures(novelty_s, drift_s, agreement_s, cfg)
 
     render(transcript, novelty_s, drift_s, agreement_s, flags, args.out)
     print(summarize(flags))
@@ -114,16 +95,14 @@ def _cmd_sample(args) -> int:
     candidates = read_candidates(
         args.shard, min_user_turns=args.min_user_turns, max_user_turns=args.max_user_turns
     )
-    print(f"{len(candidates)} conversations qualify "
-          f"({args.min_user_turns}–{args.max_user_turns} user turns, English, non-toxic, deduplicated)")
+    print(f"{len(candidates)} conversations qualify")
     try:
         export_sample(candidates, args.n, args.seed, args.out)
     except (FileExistsError, ValueError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
-    print(f"sampled {args.n} into {args.out}/ — {args.n // 2} calibration, "
-          f"{args.n - args.n // 2} test (split locked in {args.out}/split.json)")
-    print(f"label them in {args.out}/labels.csv, reading {args.out}/data/<id>.md")
+    print(f"sampled {args.n} into {args.out}/ ({args.n // 2} calibration, "
+          f"{args.n - args.n // 2} test, split saved in {args.out}/split.json)")
     return 0
 
 

@@ -1,17 +1,8 @@
-"""Sample conversations from WildChat (allenai/WildChat-1M, ODC-BY) for labeling.
+"""Samples chats from WildChat-1M (ODC-BY) for labeling.
 
-Reads one parquet shard of the dataset, keeps long English non-toxic
-conversations, drops near-duplicates (same opening message), draws a seeded
-random sample, and writes an evaluation folder:
-
-    eval/
-      data/<id>.json   conversation in sil format (no goal) — not committed
-      data/<id>.md     the same conversation, readable, for labeling
-      labels.csv       one row per conversation, label columns left blank
-      split.json       which conversations are calibration and which are test
-
-The calibration/test split is fixed here, before anyone has labeled or run the
-detector on the sample, so the test half can't be influenced by tuning.
+writes eval/data/ (the chats, not committed), eval/labels.csv (empty labels)
+and eval/split.json. the split is made here, before any labeling, so tuning
+can't leak into the test half.
 """
 
 from __future__ import annotations
@@ -58,11 +49,7 @@ def read_candidates(
     language: str = "English",
     min_latin_share: float = 0.9,
 ) -> list[Transcript]:
-    """Long, non-toxic conversations in one language, one per distinct opening message.
-
-    Conversations whose user messages are less than `min_latin_share` Latin
-    letters are dropped as well.
-    """
+    """long non-toxic english chats, one per distinct opening message"""
     import pyarrow.parquet as pq
 
     table = pq.read_table(
@@ -77,8 +64,7 @@ def read_candidates(
     )
     import pyarrow.compute as pc
 
-    # Only role and content are read from each message: the messages also carry
-    # timezone-aware timestamps, which need tz data to convert and aren't used.
+    # only role + content, the timestamps need tz data to convert
     conversations = table.column("conversation").combine_chunks()
     messages = conversations.flatten()
     roles = messages.field("role").to_pylist()
@@ -97,8 +83,7 @@ def read_candidates(
         turns = _turns(conversation)
         if len(turns) < 2 * min_user_turns or turns[0].role != "user":
             continue
-        # WildChat's language tag misses conversations whose user side is
-        # largely another script (e.g. English code with Chinese requests).
+        # the english tag lets some mostly chinese/russian chats through
         user_text = " ".join(t.text for t in turns if t.role == "user")
         if _latin_share(user_text) < min_latin_share:
             continue
@@ -115,19 +100,18 @@ def _markdown(t: Transcript) -> str:
     lines = [f"# {t.session_id}", ""]
     for turn in t.turns:
         who = "User" if turn.role == "user" else "Assistant"
-        lines += [f"## Turn {turn.index} — {who}", "", turn.text, ""]
+        lines += [f"## Turn {turn.index} ({who})", "", turn.text, ""]
     return "\n".join(lines)
 
 
 def export_sample(
     candidates: list[Transcript], n: int, seed: int, out_dir: str
 ) -> list[Transcript]:
-    """Draw `n` conversations, fix the calibration/test split, write the eval folder."""
     out = Path(out_dir)
     if (out / "split.json").exists():
         raise FileExistsError(
-            f"{out / 'split.json'} already exists — a sample has been drawn here before. "
-            "Drawing a new one would reshuffle the locked test set; use another folder."
+            f"{out / 'split.json'} already exists, redrawing would reshuffle the test set. "
+            "use another folder"
         )
     if n > len(candidates):
         raise ValueError(f"asked for {n} conversations but only {len(candidates)} qualify")

@@ -1,12 +1,7 @@
-"""Score the detector against hand labels.
+"""Scores the detector against my labels (eval/labels.csv).
 
-Reads eval/labels.csv (one row per conversation, 1 / 0 / ? per failure mode)
-and eval/split.json, runs the detector on one half of the sample, and reports
-precision / recall / F1 per mode.
-
-The calibration half is for tuning and can be evaluated as often as needed.
-Every evaluation of the test half is appended to eval/test_log.csv, because
-each look at test results makes them a little less of a test.
+tune on the calibration half only. every run on the test half gets logged
+to eval/test_log.csv so i know how many times i looked at it.
 """
 
 from __future__ import annotations
@@ -146,15 +141,15 @@ def report(result: EvalResult, verbose: bool = False) -> str:
             f"      {_fmt(s.precision)}   {_fmt(s.recall)}  {_fmt(s.f1)}"
         )
     if verbose:
-        lines += ["", "per chat (labeled → predicted):"]
+        lines += ["", "per chat (labeled -> predicted):"]
         for r in result.rows:
-            mark = "  " if set(r["labeled"]) == set(r["predicted"]) else "✗ "
-            lines.append(f"{mark}{r['id']}  {r['labeled'] or ['healthy']} → {r['predicted'] or ['none']}")
+            mark = "  " if set(r["labeled"]) == set(r["predicted"]) else "x "
+            lines.append(f"{mark}{r['id']}  {r['labeled'] or ['healthy']} -> {r['predicted'] or ['none']}")
     return "\n".join(lines)
 
 
 def log_test_run(eval_dir: str, result: EvalResult, cfg: Config) -> int:
-    """Append this test-set evaluation to test_log.csv; return how many there have been."""
+    """logs a test run, returns how many test runs there have been"""
     path = Path(eval_dir) / "test_log.csv"
     new = not path.exists()
     with open(path, "a", newline="", encoding="utf-8") as f:

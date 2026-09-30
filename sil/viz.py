@@ -1,4 +1,4 @@
-"""Trajectory chart rendering and text summary."""
+"""Charts + text summary."""
 
 from __future__ import annotations
 
@@ -34,8 +34,7 @@ def render(
     flags: list[Flag],
     out_path: str,
 ) -> None:
-    """Save a PNG: three stacked line charts (novelty, drift, agreement)
-    sharing the turn-index x-axis, with flagged regions shaded."""
+    """novelty / drift / agreement stacked, flagged turns shaded"""
     n = len(transcript.turns)
     x = range(n)
 
@@ -43,7 +42,7 @@ def render(
         3, 1, sharex=True, figsize=(14, 8), dpi=110, constrained_layout=True
     )
 
-    # agreement is markers per word, so it lives near 0.0–0.1; a 0–1 axis flattens it
+    # agreement values are tiny (~0.1 max), a 0-1 axis makes it look flat
     agreement_top = max(0.1, 1.25 * max(agreement_s, default=0.0))
     series = [
         (novelty_s, "Novelty", "#1f77b4", 1.0),
@@ -88,7 +87,7 @@ def render(
 
 
 def render_recurrence(transcript: Transcript, E, out_path: str) -> None:
-    """Save a recurrence plot: cell (i, j) is the cosine similarity of turns i and j."""
+    """cell (i, j) = similarity between turn i and turn j"""
     import numpy as np
 
     S = np.clip(E @ E.T, 0.0, 1.0)
@@ -104,19 +103,18 @@ def render_recurrence(transcript: Transcript, E, out_path: str) -> None:
         ax.set_xticks(range(n), [f"{i}{roles[i]}" for i in range(n)], fontsize=7, rotation=90)
         ax.set_yticks(range(n), [f"{i}{roles[i]}" for i in range(n)], fontsize=7)
     fig.colorbar(im, ax=ax, shrink=0.8, label="cosine similarity")
-    ax.set_title(f"{transcript.session_id} — recurrence plot", fontsize=13, fontweight="bold")
+    ax.set_title(f"{transcript.session_id} recurrence plot", fontsize=13, fontweight="bold")
     fig.savefig(out_path)
     plt.close(fig)
 
 
 def summarize(flags: list[Flag]) -> str:
-    """One line per flag: [VALIDATION LOOP] turns 8-14, severity 0.81."""
     if not flags:
         return "No failure modes detected."
     lines = []
     for f in flags:
         mode = f.mode.replace("_", " ").upper()
         lines.append(
-            f"[{mode}] turns {f.start_turn}–{f.end_turn}, severity {f.severity:.2f}"
+            f"[{mode}] turns {f.start_turn}-{f.end_turn}, severity {f.severity:.2f}"
         )
     return "\n".join(lines)

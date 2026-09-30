@@ -1,9 +1,4 @@
-"""The detection engine.
-
-All three metrics consume the unit-normalized embedding matrix E of shape
-(n, 384) and/or the raw turns, and return a list[float] of length n — one
-value per turn, 0.0 where the metric is undefined (e.g. the first turn).
-"""
+"""Detection engine. Each metric gives one value per turn."""
 
 from __future__ import annotations
 
@@ -13,8 +8,7 @@ import numpy as np
 
 from .loader import Turn
 
-# Lexical agreement markers — deliberately visible and editable; these are
-# heuristic and English-only (v0.1 limitation).
+# english only for now
 MARKERS = {
     "user_seeking": [
         "right?",
@@ -36,8 +30,6 @@ MARKERS = {
 
 @dataclass
 class Config:
-    """Detection thresholds."""
-
     novelty_window: int = 3
     agreement_window: int = 4
     drift_alpha: float = 0.3
@@ -57,12 +49,7 @@ class Flag:
 
 
 def novelty(E: np.ndarray, window: int = 3) -> list[float]:
-    """Novelty of turn t = 1 - max cosine similarity to the previous `window`
-    turns. Detects validation loops when the series flatlines.
-
-    E is unit-normalized, so cos_sim(E[t], E[t-k]) == E[t] @ E[t-k].
-    First turn is 0.0 (undefined).
-    """
+    """1 - max similarity to the last `window` turns. turn 0 is 0.0"""
     if(window<=0):
         raise ValueError("window must be at least 1")
     result = []
@@ -85,10 +72,7 @@ def novelty(E: np.ndarray, window: int = 3) -> list[float]:
 
 
 def drift(E: np.ndarray, goal_embedding: np.ndarray, alpha: float = 0.3) -> list[float]:
-    """Drift of turn t = 1 - cos_sim(E[t], goal_embedding), smoothed with an
-    exponential moving average so single tangents don't false-flag.
-    Detects drift when the series trends upward without recovering.
-    """
+    """1 - similarity to the goal, smoothed with an EMA"""
     result=[]
     for t in range(len(E)):
         raw_drift = 1 - E[t] @ goal_embedding
@@ -105,11 +89,7 @@ def drift(E: np.ndarray, goal_embedding: np.ndarray, alpha: float = 0.3) -> list
 
 
 def agreement_density(turns: list[Turn], window: int = 4) -> list[float]:
-    """Per-turn fraction of agreement markers (seeking markers for user turns,
-    supplying markers for assistant turns), rolled up with a trailing mean over
-    `window` turns. Detects validation loops (with flat novelty) and premature
-    convergence (early spike + flat novelty + no drift).
-    """
+    """agreement markers per word, averaged over the last `window` turns"""
     if(window<=0):
             raise ValueError("window must be at least 1")
     raw=[]
@@ -143,21 +123,13 @@ def flag_failures(
     agreement_s: list[float],
     cfg: Config,
 ) -> list[Flag]:
-    """Map the three metric series onto failure-mode flags.
+    """
+    novelty zig-zags between speakers so it's averaged first (skipping turn 0)
 
-    Raw novelty alternates turn to turn (each turn is also compared with the
-    other speaker's message), so the rules use its trailing mean over the last
-    cfg.min_run turns, excluding turn 0.
-
-    - validation_loop: agreement > cfg.agreement_ceiling and smoothed novelty
-      < cfg.loop_novelty_max for >= cfg.min_run consecutive turns.
-    - drift: drift > cfg.drift_ceiling for >= cfg.min_run consecutive turns,
-      without coming back down (drift at the end of the run >= at its start).
-    - premature_convergence: smoothed novelty < cfg.novelty_floor for the last
-      >= cfg.min_run turns (it never recovers), with agreement staying at or
-      below cfg.agreement_ceiling (otherwise it's a validation loop).
-
-    Severity is the fraction of the session the flagged span covers.
+    validation loop: high agreement + low novelty for min_run turns
+    drift: drift above the ceiling for min_run turns and doesn't come back down
+    premature convergence: low novelty till the end, agreement stays low
+    severity = flagged turns / total turns
     """
     def runs(cond, min_run):
         result = []

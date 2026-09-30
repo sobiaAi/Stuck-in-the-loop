@@ -1,12 +1,7 @@
-"""Sentence-embedding utilities.
+"""Embeddings with all-MiniLM-L6-v2 (384 dims).
 
-Uses sentence-transformers all-MiniLM-L6-v2 (small, CPU-friendly, 384 dims).
-All embeddings are unit-normalized on return so downstream cosine similarity
-is a plain dot product.
-
-Turn embeddings are cached per session to .sil_cache/ keyed on session_id
-plus a hash of the turn texts, so editing a transcript invalidates its cache
-instead of silently serving stale vectors.
+Vectors are normalized to length 1, so cosine similarity is just a dot product.
+Cache key includes a hash of the texts so an edited transcript gets re-embedded.
 """
 
 from __future__ import annotations
@@ -46,11 +41,7 @@ def _cache_path(session_id: str, texts: list[str]) -> Path:
 
 
 def embed_turns(turns: list[Turn], session_id: str | None = None) -> np.ndarray:
-    """Embed every turn. Returns a unit-normalized array of shape (n_turns, 384).
-
-    If session_id is given, results are cached to .sil_cache/ and re-runs
-    are instant.
-    """
+    """Returns shape (n_turns, 384). Cached in .sil_cache/ if session_id is given."""
     texts = [t.text for t in turns]
 
     cache_file = None
@@ -70,6 +61,6 @@ def embed_turns(turns: list[Turn], session_id: str | None = None) -> np.ndarray:
 
 
 def embed_text(text: str) -> np.ndarray:
-    """Embed a single string (e.g. the session goal). Unit-normalized, shape (384,)."""
+    """Returns shape (384,). Used for the goal."""
     v = _get_model().encode([text], convert_to_numpy=True)[0]
     return _normalize(v.astype(np.float32))

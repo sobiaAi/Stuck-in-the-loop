@@ -13,7 +13,6 @@ def write(tmp_path, name, content):
 
 
 def chatgpt_conv(title, messages):
-    """Build a minimal ChatGPT-export conversation from (role, text) pairs."""
     mapping = {"root": {"id": "root", "message": None, "parent": None, "children": []}}
     prev = "root"
     for i, (role, text) in enumerate(messages):
@@ -43,7 +42,7 @@ def claude_conv(name, messages):
     }
 
 
-# --- native format --------------------------------------------------------
+# native format
 
 def test_native_json_passes_through(tmp_path):
     path = write(tmp_path, "t.json", {
@@ -62,7 +61,7 @@ def test_goal_argument_overrides(tmp_path):
     assert load_any(path, goal="fix the bug").goal == "fix the bug"
 
 
-# --- ChatGPT export -------------------------------------------------------
+# chatgpt export
 
 def test_chatgpt_export(tmp_path):
     conv = chatgpt_conv("Paging bug", [
@@ -84,7 +83,7 @@ def test_chatgpt_export(tmp_path):
 
 def test_chatgpt_follows_current_branch(tmp_path):
     conv = chatgpt_conv("c", [("user", "q"), ("assistant", "old answer")])
-    # add a regenerated sibling answer and make it the current node
+    # regenerated answer becomes the current node
     conv["mapping"]["alt"] = {
         "id": "alt", "parent": "n0", "children": [],
         "message": {"author": {"role": "assistant"},
@@ -116,7 +115,7 @@ def test_export_with_many_conversations_needs_selection(tmp_path):
     ]
 
 
-# --- Claude export --------------------------------------------------------
+# claude export
 
 def test_claude_export(tmp_path):
     path = write(tmp_path, "conversations.json", [
@@ -127,7 +126,7 @@ def test_claude_export(tmp_path):
     assert t.turns[0].text == "Plan my exam."
 
 
-# --- pasted text ----------------------------------------------------------
+# pasted text
 
 def test_pasted_chatgpt_copy(tmp_path):
     text = (
@@ -177,7 +176,7 @@ def test_ordinary_sentences_are_not_labels(tmp_path):
 
 
 def test_files_saved_with_a_bom_keep_their_first_turn(tmp_path):
-    # Notepad / PowerShell often prepend a UTF-8 byte-order mark
+    # notepad adds a BOM sometimes
     p = tmp_path / "chat.txt"
     p.write_bytes("﻿You said:\nfirst\nChatGPT said:\nsecond\n".encode("utf-8"))
     assert [x.text for x in load_any(str(p)).turns] == ["first", "second"]

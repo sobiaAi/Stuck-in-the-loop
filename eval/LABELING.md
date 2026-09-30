@@ -1,74 +1,72 @@
-# Labeling protocol
+# Labeling rules
 
-Labels are the ground truth the detector is scored against, so they have to be
-made independently of it.
+The labels are what the detector gets scored against, so they can't be
+influenced by the detector.
 
 ## Rules
 
-1. **Don't run the tool on these conversations until you've finished labeling
-   them.** Not `analyze`, not `evaluate`, not a chart. Labels made after seeing
-   the tool's output drift toward agreeing with it.
-2. Label in the order of `labels.csv`. It is sorted by id, which hides which
-   conversations are in the calibration half and which are in the test half.
-3. Read the whole conversation in `data/<id>.md` before filling its row.
-4. Once `evaluate` has been run on a half, don't change that half's labels.
+1. Don't run the tool on these chats until labeling is done (no `analyze`, no
+   `evaluate`, no charts). Otherwise the labels end up agreeing with the tool.
+2. Go in the order of `labels.csv`. It's sorted by id so it doesn't show which
+   chats are in the calibration half and which are in the test half.
+3. Read the whole chat in `data/<id>.md` before filling in its row.
+4. After `evaluate` has been run on a half, that half's labels don't change.
 
 ## Columns
 
-| Column | What to write |
+| Column | What goes in it |
 |---|---|
-| `goal` | One sentence: what the user wanted, as it reads at the **start** of the conversation. Skip greetings and write what the first real request was after. |
+| `goal` | one sentence, what the user wanted at the start (skip greetings) |
 | `validation_loop` | `1` / `0` / `?` |
 | `premature_convergence` | `1` / `0` / `?` |
 | `drift` | `1` / `0` / `?` |
-| `pivot` | `1` / `0` / `?` (recorded, not scored yet) |
-| `capitulation` | `1` / `0` / `?` (recorded, not scored yet) |
-| `notes` | A few words on why, especially for `1` and `?`. |
+| `pivot` | `1` / `0` / `?` (not scored yet) |
+| `capitulation` | `1` / `0` / `?` (not scored yet) |
+| `notes` | a few words on why, mainly for `1` and `?` |
 
-A conversation can have several `1`s. All `0`s means healthy. Use `?` only when
-you genuinely can't decide; `?` is left out of the scores for that column.
+A chat can have more than one `1`. All `0` means healthy. `?` is only for when
+I really can't decide, and it's left out of the scores.
 
 ## Definitions
 
-A mode gets a `1` if it holds for a **sustained stretch** (several exchanges),
-not for a single message.
+Something only counts if it goes on for a few exchanges, not one message.
 
-**Validation loop.** The user keeps seeking agreement or reassurance, the
-assistant keeps supplying it, and nothing new enters the conversation while
-it goes on. Both sides are needed: a polite assistant alone is not a loop.
+**Validation loop**: the user keeps asking for agreement or reassurance, the AI
+keeps giving it, and nothing new comes in. Both sides are needed, a polite AI
+on its own isn't a loop.
 
-**Premature convergence.** The conversation settles on one answer or approach
-early and stops considering alternatives, although alternatives were plausible
-or the user's need wasn't clearly met. Settling on a *good* answer that fits
-the need is not premature.
+**Premature convergence**: the chat settles on one answer early and stops
+looking at other options, even though there were other reasonable options or
+the user's need wasn't really met. Settling on a good answer that fits isn't
+premature.
 
-**Drift.** The conversation moves away from the goal gradually and doesn't
-come back, without the user deliberately changing topic. Short tangents that
-return don't count.
+**Drift**: the chat slowly moves away from the goal and doesn't come back, and
+the user didn't change the topic on purpose. Short tangents that come back
+don't count.
 
-**Pivot.** The user deliberately switches to a different goal ("ok, now help me
-with…"). Not a failure; recorded so pivots can be told apart from drift.
+**Pivot**: the user changes to a new goal on purpose ("ok now help me
+with..."). Not a failure, it's there so pivots can be told apart from drift.
 
-**Capitulation.** The assistant reverses a position after the user pushes back,
-without the user supplying new evidence. Reversing because of new evidence
-(a correction, a document, a fact) is not capitulation.
+**Capitulation**: the AI changes its answer after the user pushes back, without
+the user giving any new evidence. Changing because of new evidence (a
+correction, a fact, a document) doesn't count.
 
 ## Data
 
-Conversations are sampled from [WildChat-1M](https://huggingface.co/datasets/allenai/WildChat-1M)
-(Zhao et al., 2024; ODC-BY), shard `train-00000-of-00014.parquet`, seed 7.
+From [WildChat-1M](https://huggingface.co/datasets/allenai/WildChat-1M)
+(Zhao et al., 2024, ODC-BY), file `train-00000-of-00014.parquet`, seed 7.
 
-Inclusion criteria, fixed before labeling:
+Chats are included if they are:
 
-- tagged English and not toxic in the dataset
-- 6–20 user turns (12–40 messages)
-- the user's messages are at least 90% Latin-alphabet letters (the dataset's
-  language tag lets through some conversations written mostly in other scripts)
-- one conversation per distinct opening message (the dataset has many
+- tagged English and not toxic
+- 6 to 20 user turns (12 to 40 messages)
+- at least 90% Latin letters on the user side (the English tag lets some
+  mostly Chinese/Russian chats through)
+- not a repeat of an opening message already picked (the dataset has lots of
   repeated prompts)
 
-60 conversations are drawn at random from those that qualify; 30 become the
-calibration half and 30 the held-out test half.
+60 chats were picked at random from the ones that qualify, 30 for calibration
+and 30 for testing.
 
-The conversation texts in `data/` are not committed; `sil sample-wildchat`
-regenerates them from the same shard and seed.
+The chat texts in `data/` aren't committed, `sil sample-wildchat` makes them
+again from the same file and seed.

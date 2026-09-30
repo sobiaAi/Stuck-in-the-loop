@@ -68,7 +68,7 @@ def test_exported_files(tmp_path):
     for t in sample:
         loaded = load_transcript(str(out / "data" / f"{t.session_id}.json"))
         assert loaded.goal is None and len(loaded.turns) == len(t.turns)
-        assert "## Turn 0 — User" in (out / "data" / f"{t.session_id}.md").read_text(encoding="utf-8")
+        assert "## Turn 0 (User)" in (out / "data" / f"{t.session_id}.md").read_text(encoding="utf-8")
 
     with open(out / "labels.csv", newline="", encoding="utf-8") as f:
         rows = list(csv.reader(f))
