@@ -73,18 +73,30 @@ def _cmd_analyze(args) -> int:
         render_recurrence(transcript, E, args.recurrence)
         print(f"recurrence plot saved to {args.recurrence}")
 
+    from .pushback import find_circling, find_pushback
+    from .report import pushback_report
+
+    events = find_pushback(transcript.turns, E)
+    circles = find_circling(events)
+    print(pushback_report(transcript.turns, events, circles))
+
     goal_embedding = _goal_embedding(transcript, E, metrics, embed_text)
     if goal_embedding is None:
-        print('error: this chat has no goal, pass one with --goal "..."', file=sys.stderr)
-        return 1
+        # no goal given: drift is measured from the first user message
+        first = next(t.text for t in transcript.turns if t.role == "user")
+        goal_embedding = embed_text(first)
 
     novelty_s = metrics.novelty(E, window=cfg.novelty_window)
     drift_s = metrics.drift(E, goal_embedding, alpha=cfg.drift_alpha)
     agreement_s = metrics.agreement_density(transcript.turns, window=cfg.agreement_window)
     flags = metrics.flag_failures(novelty_s, drift_s, agreement_s, cfg)
 
-    render(transcript, novelty_s, drift_s, agreement_s, flags, args.out)
-    print(summarize(flags))
+    render(transcript, novelty_s, drift_s, agreement_s, flags, args.out, events=events, circles=circles)
+    if flags:
+        print()
+        print("other signals (not yet validated on real chats):")
+        print(summarize(flags))
+    print()
     print(f"chart saved to {args.out}")
     return 0
 

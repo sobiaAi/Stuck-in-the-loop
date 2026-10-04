@@ -12,6 +12,7 @@ from matplotlib.ticker import MaxNLocator
 
 from .loader import Transcript
 from .metrics import Flag
+from .pushback import Circling, PushbackEvent
 
 FLAG_COLORS = {
     "validation_loop": "#d62728",  # red
@@ -33,14 +34,36 @@ def render(
     agreement_s: list[float],
     flags: list[Flag],
     out_path: str,
+    events: list[PushbackEvent] | None = None,
+    circles: list[Circling] | None = None,
 ) -> None:
-    """novelty / drift / agreement stacked, flagged turns shaded"""
+    """pushback on top, then novelty / drift / agreement, flagged turns shaded"""
     n = len(transcript.turns)
     x = range(n)
+    events = events or []
+    circles = circles or []
 
     fig, axes = plt.subplots(
-        3, 1, sharex=True, figsize=(14, 8), dpi=110, constrained_layout=True
+        4, 1, sharex=True, figsize=(14, 10), dpi=110, constrained_layout=True,
+        gridspec_kw={"height_ratios": [1.2, 1, 1, 1]},
     )
+    ax = axes[0]
+    ax.bar([e.turn for e in events], [e.prob for e in events], width=0.8,
+           color=["#d62728" if e.outcome == "caved" else "#1f77b4" if e.is_pushback else "#c7c7c7" for e in events])
+    ax.axhline(0.5, color="#7f7f7f", linewidth=0.8, linestyle="--")
+    for c in circles:
+        ax.axvspan(c.start_turn - 0.5, c.end_turn + 0.5, color="#8c564b", alpha=0.15, linewidth=0)
+    for e in events:
+        if e.outcome == "caved":
+            ax.annotate("caved", (e.turn, e.prob), textcoords="offset points", xytext=(0, 4),
+                        ha="center", fontsize=9, color="#d62728")
+    ax.set_ylabel("Pushback", fontsize=11)
+    ax.set_ylim(0, 1.15)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    if circles:
+        ax.legend(handles=[Patch(facecolor="#8c564b", alpha=0.3, label="Circling")],
+                  loc="upper right", frameon=False, fontsize=10)
 
     # agreement values are tiny (~0.1 max), a 0-1 axis makes it look flat
     agreement_top = max(0.1, 1.25 * max(agreement_s, default=0.0))
@@ -50,7 +73,7 @@ def render(
         (agreement_s, "Agreement density", "#7f7f7f", agreement_top),
     ]
 
-    for ax, (values, label, color, top) in zip(axes, series):
+    for ax, (values, label, color, top) in zip(axes[1:], series):
         ax.plot(x, values, color=color, linewidth=2, marker="o", markersize=3.5)
         ax.set_ylabel(label, fontsize=11)
         ax.set_ylim(-0.05 * top, 1.05 * top)
@@ -79,7 +102,7 @@ def render(
             )
             for m in seen_modes
         ]
-        axes[0].legend(handles=handles, loc="upper right", frameon=False, fontsize=10)
+        axes[1].legend(handles=handles, loc="upper right", frameon=False, fontsize=10)
 
     fig.suptitle(transcript.session_id, fontsize=14, fontweight="bold")
     fig.savefig(out_path)
